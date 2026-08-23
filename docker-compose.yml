@@ -1,0 +1,9 @@
+services:
+  prompt-app:
+    build: .
+    container_name: prompt-toiyeuai
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3000:3000"
