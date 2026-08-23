@@ -17,7 +17,7 @@ npm install
 npm run dev
 ```
 
-Mở `http://127.0.0.1:3000`. Nếu có `APP_PASSWORD`, trình duyệt sẽ hỏi Basic Auth (username có thể là bất kỳ giá trị nào; password là `APP_PASSWORD`). Để kiểm tra production build ngoài Docker:
+Mở `http://127.0.0.1:3000`. Nếu có `APP_PASSWORD`, trình duyệt sẽ hỏi Basic Auth — username là `APP_USERNAME` (mặc định `admin`), password là `APP_PASSWORD`. Cả hai vế đều được kiểm. Để kiểm tra production build ngoài Docker:
 
 ```bash
 npm run build
@@ -33,7 +33,8 @@ npm start
 | `ANTHROPIC_MAX_TOKENS` | `3500` | Output token tối đa (server chặn ở 8192) |
 | `AI_TIMEOUT_MS` | `90000` | Timeout upstream (server chặn ở 180 giây) |
 | `RATE_LIMIT_PER_MINUTE` | `12` | Số request/IP/phút |
-| `APP_PASSWORD` | trống | Bật Basic Auth khi có giá trị |
+| `APP_USERNAME` | `admin` | Tên đăng nhập Basic Auth |
+| `APP_PASSWORD` | trống | Bật Basic Auth khi có giá trị. Để trống là web mở công khai |
 
 Frontend chỉ gọi `POST /api/generate`. API key không được bundle, log hoặc trả về browser. Rate limiter là `Map` trong process với cleanup bucket cũ: phù hợp một container trên VPS, tự reset khi restart và **không chia sẻ** giữa nhiều replica. Nếu sau này scale ngang mới cần limiter dùng storage chung.
 
@@ -58,10 +59,10 @@ nano .env                         # nhập secret trực tiếp trên VPS
 docker build -t xuong-che-kich-ban .
 docker compose up -d --build
 docker compose ps
-curl -I http://127.0.0.1:3000     # 401 là đúng khi APP_PASSWORD bật
+curl -I http://127.0.0.1:3005     # 401 là đúng khi APP_PASSWORD bật
 ```
 
-Container chạy standalone Next server bằng `node server.js`, không chạy development server. Port chỉ bind loopback `127.0.0.1:3000` và có healthcheck.
+Container chạy standalone Next server bằng `node server.js`, không chạy development server. Trong container app nghe cổng `3000`, nhưng compose chỉ bind ra host ở loopback `127.0.0.1:3005` — đây mới là cổng Nginx trỏ tới. Có healthcheck.
 
 ## Nginx, DNS và HTTPS
 
@@ -76,7 +77,20 @@ sudo certbot --nginx -d prompt.toiyeuai.online
 curl -I https://prompt.toiyeuai.online
 ```
 
-Nginx chuyển tiếp IP thật cho rate limit và chờ upstream tối đa 120 giây. Không public trực tiếp port 3000.
+Nginx chuyển tiếp IP thật cho rate limit và chờ upstream tối đa 120 giây. Không public trực tiếp cổng `3005`; chỉ Nginx trên chính máy được phép gọi vào.
+
+## MCP cho Claude Code
+
+Repo khai báo sẵn một MCP server trong `.mcp.json`: **Playwright**, cho phép Claude Code mở trình duyệt thật để kiểm thử giao diện xưởng — điều hướng `http://127.0.0.1:3000`, bấm qua luồng tạo kịch bản, chụp màn hình, đọc console và network request khi UI lỗi.
+
+```bash
+npx playwright install chromium   # chỉ cần chạy một lần trên máy local
+npm run dev                       # mở app ở cổng 3000 để Claude điều khiển
+```
+
+Lần đầu mở Claude Code trong repo, gõ `/mcp` để duyệt server (config theo project luôn cần xác nhận thủ công) và kiểm tra trạng thái là `connected`. Server chạy với `--isolated`: profile trình duyệt giữ trong RAM, không ghi cookie hay session xuống đĩa.
+
+Truy cập file bị giới hạn trong thư mục repo theo mặc định. Nếu cần Basic Auth, đưa `APP_PASSWORD` vào URL dạng `http://user:password@127.0.0.1:3000` — dùng password local, không dùng credential production.
 
 ## Checklist trước khi phát hành
 
