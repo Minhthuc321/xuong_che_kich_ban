@@ -78,6 +78,19 @@ curl -I https://prompt.toiyeuai.online
 
 Nginx chuyển tiếp IP thật cho rate limit và chờ upstream tối đa 120 giây. Không public trực tiếp port 3000.
 
+## MCP cho Claude Code
+
+Repo khai báo sẵn một MCP server trong `.mcp.json`: **Playwright**, cho phép Claude Code mở trình duyệt thật để kiểm thử giao diện xưởng — điều hướng `http://127.0.0.1:3000`, bấm qua luồng tạo kịch bản, chụp màn hình, đọc console và network request khi UI lỗi.
+
+```bash
+npx playwright install chromium   # chỉ cần chạy một lần trên máy local
+npm run dev                       # mở app ở cổng 3000 để Claude điều khiển
+```
+
+Lần đầu mở Claude Code trong repo, gõ `/mcp` để duyệt server (config theo project luôn cần xác nhận thủ công) và kiểm tra trạng thái là `connected`. Server chạy với `--isolated`: profile trình duyệt giữ trong RAM, không ghi cookie hay session xuống đĩa.
+
+Truy cập file bị giới hạn trong thư mục repo theo mặc định. Nếu cần Basic Auth, đưa `APP_PASSWORD` vào URL dạng `http://user:password@127.0.0.1:3000` — dùng password local, không dùng credential production.
+
 ## Checklist trước khi phát hành
 
 ```bash
