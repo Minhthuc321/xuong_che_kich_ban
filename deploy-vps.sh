@@ -52,6 +52,8 @@ if [ -f .env ]; then
 else
   msg "Tạo .env"
   read -rsp "ANTHROPIC_API_KEY: " API_KEY;   echo
+  read -rp  "APP_USERNAME (tên đăng nhập web) [admin]: " APP_USER; echo
+  APP_USER="${APP_USER:-admin}"
   read -rsp "APP_PASSWORD (mật khẩu vào web): " APP_PW; echo
   [ -n "$API_KEY" ] || die "ANTHROPIC_API_KEY không được trống."
   [ -n "$APP_PW" ]  || warn "APP_PASSWORD trống — web sẽ mở công khai, ai cũng vào được."
@@ -63,9 +65,10 @@ ANTHROPIC_MODEL=claude-sonnet-4-6
 ANTHROPIC_MAX_TOKENS=3500
 AI_TIMEOUT_MS=90000
 RATE_LIMIT_PER_MINUTE=12
+APP_USERNAME=$APP_USER
 APP_PASSWORD=$APP_PW
 EOF
-  unset API_KEY APP_PW
+  unset API_KEY APP_PW APP_USER
 fi
 chmod 600 .env
 chown root:root .env
@@ -143,7 +146,7 @@ cat <<EOF
 
 ------------------------------------------------------------------
 Xong. HTTP 401 là ĐÚNG khi đã bật APP_PASSWORD — trình duyệt sẽ hỏi
-đăng nhập (username gõ gì cũng được, password là APP_PASSWORD).
+đăng nhập bằng APP_USERNAME + APP_PASSWORD vừa đặt ở trên.
 
 Lệnh hay dùng:
   cd $APP_DIR

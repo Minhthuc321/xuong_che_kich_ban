@@ -17,7 +17,7 @@ npm install
 npm run dev
 ```
 
-Mở `http://127.0.0.1:3000`. Nếu có `APP_PASSWORD`, trình duyệt sẽ hỏi Basic Auth (username có thể là bất kỳ giá trị nào; password là `APP_PASSWORD`). Để kiểm tra production build ngoài Docker:
+Mở `http://127.0.0.1:3000`. Nếu có `APP_PASSWORD`, trình duyệt sẽ hỏi Basic Auth — username là `APP_USERNAME` (mặc định `admin`), password là `APP_PASSWORD`. Cả hai vế đều được kiểm. Để kiểm tra production build ngoài Docker:
 
 ```bash
 npm run build
@@ -33,7 +33,8 @@ npm start
 | `ANTHROPIC_MAX_TOKENS` | `3500` | Output token tối đa (server chặn ở 8192) |
 | `AI_TIMEOUT_MS` | `90000` | Timeout upstream (server chặn ở 180 giây) |
 | `RATE_LIMIT_PER_MINUTE` | `12` | Số request/IP/phút |
-| `APP_PASSWORD` | trống | Bật Basic Auth khi có giá trị |
+| `APP_USERNAME` | `admin` | Tên đăng nhập Basic Auth |
+| `APP_PASSWORD` | trống | Bật Basic Auth khi có giá trị. Để trống là web mở công khai |
 
 Frontend chỉ gọi `POST /api/generate`. API key không được bundle, log hoặc trả về browser. Rate limiter là `Map` trong process với cleanup bucket cũ: phù hợp một container trên VPS, tự reset khi restart và **không chia sẻ** giữa nhiều replica. Nếu sau này scale ngang mới cần limiter dùng storage chung.
 
