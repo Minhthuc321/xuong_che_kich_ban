@@ -58,10 +58,10 @@ nano .env                         # nhập secret trực tiếp trên VPS
 docker build -t xuong-che-kich-ban .
 docker compose up -d --build
 docker compose ps
-curl -I http://127.0.0.1:3000     # 401 là đúng khi APP_PASSWORD bật
+curl -I http://127.0.0.1:3005     # 401 là đúng khi APP_PASSWORD bật
 ```
 
-Container chạy standalone Next server bằng `node server.js`, không chạy development server. Port chỉ bind loopback `127.0.0.1:3000` và có healthcheck.
+Container chạy standalone Next server bằng `node server.js`, không chạy development server. Trong container app nghe cổng `3000`, nhưng compose chỉ bind ra host ở loopback `127.0.0.1:3005` — đây mới là cổng Nginx trỏ tới. Có healthcheck.
 
 ## Nginx, DNS và HTTPS
 
@@ -76,7 +76,7 @@ sudo certbot --nginx -d prompt.toiyeuai.online
 curl -I https://prompt.toiyeuai.online
 ```
 
-Nginx chuyển tiếp IP thật cho rate limit và chờ upstream tối đa 120 giây. Không public trực tiếp port 3000.
+Nginx chuyển tiếp IP thật cho rate limit và chờ upstream tối đa 120 giây. Không public trực tiếp cổng `3005`; chỉ Nginx trên chính máy được phép gọi vào.
 
 ## MCP cho Claude Code
 
