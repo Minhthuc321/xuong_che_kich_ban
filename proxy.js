@@ -10,7 +10,13 @@ export function proxy(request) {
       const decoded = atob(auth.slice(6));
       const splitAt = decoded.indexOf(":");
       const suppliedPassword = splitAt >= 0 ? decoded.slice(splitAt + 1) : "";
-      if (suppliedPassword === password) return NextResponse.next();
+      // So sánh toàn bộ chuỗi thay vì thoát ngay tại ký tự sai đầu tiên.
+      const maxLength = Math.max(suppliedPassword.length, password.length);
+      let difference = suppliedPassword.length ^ password.length;
+      for (let index = 0; index < maxLength; index += 1) {
+        difference |= (suppliedPassword.charCodeAt(index) || 0) ^ (password.charCodeAt(index) || 0);
+      }
+      if (difference === 0) return NextResponse.next();
     } catch {}
   }
 

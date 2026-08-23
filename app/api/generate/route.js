@@ -5,19 +5,32 @@ export const dynamic = "force-dynamic";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const MAX_PROMPT_CHARS = 140000;
-const MAX_TOKENS = Number(process.env.ANTHROPIC_MAX_TOKENS || 3500);
-const REQUEST_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || 90000);
-const RATE_LIMIT = Number(process.env.RATE_LIMIT_PER_MINUTE || 12);
+function positiveInteger(value, fallback, maximum) {
+  const parsed = Number.parseInt(value || "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, maximum) : fallback;
+}
+
+const MAX_TOKENS = positiveInteger(process.env.ANTHROPIC_MAX_TOKENS, 3500, 8192);
+const REQUEST_TIMEOUT_MS = positiveInteger(process.env.AI_TIMEOUT_MS, 90000, 180000);
+const RATE_LIMIT = positiveInteger(process.env.RATE_LIMIT_PER_MINUTE, 12, 1000);
 const RATE_WINDOW_MS = 60_000;
 const buckets = new Map();
 
 function clientIp(request) {
-  const xff = request.headers.get("x-forwarded-for");
-  return (xff?.split(",")[0] || request.headers.get("x-real-ip") || "unknown").trim();
+  // Port ứng dụng chỉ bind loopback và Nginx luôn ghi đè header này bằng
+  // $remote_addr, vì vậy không đọc chuỗi X-Forwarded-For do client tạo.
+  return (request.headers.get("x-real-ip") || "unknown").trim();
 }
 
 function isRateLimited(ip) {
   const now = Date.now();
+  // Một process Docker chỉ cần bộ nhớ cục bộ. Quét định kỳ để bucket của IP cũ
+  // không tồn tại suốt vòng đời container; nhiều replica nên dùng shared limiter.
+  if (buckets.size > 500 && Math.random() < 0.05) {
+    for (const [key, bucket] of buckets) {
+      if (now - bucket.startedAt >= RATE_WINDOW_MS * 2) buckets.delete(key);
+    }
+  }
   const current = buckets.get(ip);
   if (!current || now - current.startedAt >= RATE_WINDOW_MS) {
     buckets.set(ip, { startedAt: now, count: 1 });
@@ -29,7 +42,7 @@ function isRateLimited(ip) {
 
 async function callAnthropic(prompt) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw Object.assign(new Error("Máy chủ chưa cấu hình ANTHROPIC_API_KEY."), { status: 503 });
+  if (!apiKey) throw Object.assign(new Error("Missing API configuration"), { status: 503, code: "MISSING_API_KEY" });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -52,8 +65,7 @@ async function callAnthropic(prompt) {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const message = data?.error?.message || `Anthropic API lỗi ${response.status}`;
-      throw Object.assign(new Error(message), { status: response.status });
+      throw Object.assign(new Error(`Anthropic API lỗi ${response.status}`), { status: response.status });
     }
 
     const text = Array.isArray(data?.content)
@@ -93,7 +105,9 @@ export async function POST(request) {
     const status = aborted ? 504 : Number(error?.status) || 500;
     const safeMessage = aborted
       ? "AI phản hồi quá lâu. Hãy chạy lại."
-      : status === 401 || status === 403
+      : error?.code === "MISSING_API_KEY"
+        ? "Máy chủ chưa được cấu hình khóa Anthropic."
+        : status === 401 || status === 403
         ? "API key Anthropic không hợp lệ hoặc chưa có quyền dùng model."
         : status === 429
           ? "Anthropic đang giới hạn lượt gọi. Hãy thử lại sau."
@@ -101,7 +115,7 @@ export async function POST(request) {
             ? "Dịch vụ AI đang lỗi. Hãy thử lại sau."
             : error?.message || "Không gọi được AI.";
 
-    console.error("/api/generate", { status, message: error?.message });
+    console.error("/api/generate", { status, type: error?.name || "UpstreamError" });
     return NextResponse.json({ error: safeMessage }, { status });
   }
 }

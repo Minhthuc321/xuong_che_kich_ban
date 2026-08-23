@@ -3,7 +3,14 @@ services:
     build: .
     container_name: prompt-toiyeuai
     restart: unless-stopped
+    init: true
     env_file:
       - .env
     ports:
       - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>{if(r.status!==200&&r.status!==401)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
